@@ -1,0 +1,24 @@
+harbor-operator {{ .Chart.AppVersion }} is installed in namespace {{ .Release.Namespace }}.
+{{- if .Values.watchNamespaces }}
+It manages resources in: {{ join ", " .Values.watchNamespaces }}.
+{{- else }}
+It manages resources in all namespaces.
+{{- end }}
+
+Connect it to Harbor:
+
+  kubectl create secret generic harbor-admin --from-literal=password='<admin password>'
+  kubectl apply -f - <<'YAML'
+  apiVersion: harbor.graphzc.io/v1alpha1
+  kind: HarborConnection
+  metadata:
+    name: harbor
+  spec:
+    url: https://harbor.example.com
+    passwordSecretRef:
+      name: harbor-admin
+  YAML
+
+  kubectl get harborconnection harbor
+
+Then create Projects, Users, Groups and RobotAccounts that reference it.

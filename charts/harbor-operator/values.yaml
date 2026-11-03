@@ -1,0 +1,88 @@
+# -- Number of operator replicas. Only the elected leader reconciles.
+replicaCount: 1
+
+image:
+  # -- Operator image repository.
+  repository: ghcr.io/graphzc/harbor-operator
+  # -- Image tag. Defaults to the chart appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# -- Secrets used to pull the operator image.
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+crds:
+  # -- Install and upgrade the CRDs with the chart.
+  install: true
+  # -- Keep the CRDs (and therefore all Harbor resources) when the release is uninstalled.
+  keep: true
+
+# -- Namespaces whose resources the operator manages. Empty means all namespaces.
+watchNamespaces: []
+
+leaderElection:
+  # -- Enable leader election. Required when replicaCount > 1.
+  enabled: true
+
+logging:
+  # -- Log level: debug, info or error.
+  level: info
+  # -- Log format: json or console.
+  encoder: json
+
+# -- Extra command-line arguments for the manager.
+extraArgs: []
+
+# -- Extra environment variables for the manager container.
+extraEnv: []
+
+serviceAccount:
+  # -- Create a ServiceAccount for the operator.
+  create: true
+  # -- Name of the ServiceAccount. Generated from the fullname when empty.
+  name: ""
+  annotations: {}
+
+rbac:
+  # -- Create the ClusterRole and bindings the operator needs.
+  create: true
+  # -- Add read/write permissions on Harbor resources to the built-in
+  # "admin" and "edit" roles, and read permissions to "view".
+  aggregateToDefaultRoles: true
+
+metrics:
+  # -- Expose controller-runtime metrics.
+  enabled: true
+  # -- Serve metrics over HTTPS with Kubernetes authentication and authorization.
+  secure: true
+  port: 8443
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 10m
+    memory: 64Mi
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+priorityClassName: ""

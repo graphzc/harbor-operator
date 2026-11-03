@@ -1,0 +1,20 @@
+# Without passwordSecretRef, a password is generated and stored in the
+# Secret "alice-credentials" (keys: username, password).
+apiVersion: harbor.graphzc.io/v1alpha1
+kind: User
+metadata:
+  labels:
+    app.kubernetes.io/name: harbor-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: alice
+spec:
+  harborConnectionRef:
+    name: harbor
+  username: alice
+  email: alice@example.com
+  realName: Alice
+  generatedSecret:
+    name: alice-credentials
+  # passwordSecretRef:
+  #   name: alice-password
+  #   key: password

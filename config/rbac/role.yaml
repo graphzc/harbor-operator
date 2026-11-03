@@ -1,0 +1,56 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - harbor.graphzc.io
+  resources:
+  - groups
+  - harborconnections
+  - projects
+  - robotaccounts
+  - users
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - harbor.graphzc.io
+  resources:
+  - groups/finalizers
+  - harborconnections/finalizers
+  - projects/finalizers
+  - robotaccounts/finalizers
+  - users/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - harbor.graphzc.io
+  resources:
+  - groups/status
+  - harborconnections/status
+  - projects/status
+  - robotaccounts/status
+  - users/status
+  verbs:
+  - get
+  - patch
+  - update

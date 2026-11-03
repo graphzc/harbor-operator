@@ -1,0 +1,14 @@
+apiVersion: v2
+name: harbor-operator
+description: Manage Harbor users, groups, projects and robot accounts from Kubernetes.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.25.0-0"
+keywords:
+  - harbor
+  - operator
+  - registry
+home: https://github.com/graphzc/harbor-operator
+sources:
+  - https://github.com/graphzc/harbor-operator
