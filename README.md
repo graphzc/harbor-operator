@@ -1,7 +1,7 @@
 # harbor-operator
 
 A Kubernetes operator that manages [Harbor](https://github.com/goharbor/harbor)
-users, groups, projects and robot accounts declaratively. Built with Operator SDK
+users, groups, projects, robot accounts and system configuration declaratively. Built with Operator SDK
 and controller-runtime.
 
 ## Resources
@@ -17,6 +17,7 @@ same namespace through `spec.harborConnectionRef`.
 | `Group` | `hg` | Harbor user groups (`HTTP`, `LDAP`, `OIDC`). |
 | `Project` | `hp` | Projects, with visibility, storage quota, policies, CVE allowlist and user/group members. |
 | `RobotAccount` | `hra` | System-level or project-level robot accounts and their permissions. |
+| `Configuration` | `hcfg` | Harbor system configuration (`/api/v2.0/configurations`), such as auth mode, OIDC/LDAP and project creation settings. |
 
 Samples for each kind are in [config/samples](config/samples).
 
@@ -52,7 +53,7 @@ credential itself.
   operator takes it over and makes it match the spec.
 - **Drift correction:** every resource is re-checked every 10 minutes and
   whenever its `HarborConnection` or a referenced Secret changes.
-- **Deletion:** `spec.deletionPolicy: Delete` (the default) removes the Harbor
+- **Deletion:** except for `Configuration`, `spec.deletionPolicy: Delete` (the default) removes the Harbor
   object when the resource is deleted; `Orphan` leaves it in place. If the
   `HarborConnection` or its Secret is already gone, the finalizer is removed
   without cleanup. Harbor refuses to delete projects that still contain
@@ -62,6 +63,11 @@ credential itself.
   Members not in the list are removed, except the `HarborConnection` user. When
   the list is empty, membership is not managed.
 - **Project policies:** a policy field that is not set is left as it is in Harbor.
+- **Configuration:** keys are the camelCase form of Harbor's configuration
+  keys (`project_creation_restriction` becomes `projectCreationRestriction`).
+  Only the keys listed in `spec.settings` and `spec.secretSettings` are
+  managed. Harbor has a single configuration, so deleting a `Configuration`
+  leaves the settings in place.
 - The `HarborConnection` user cannot be managed as a `User`, so the operator
   cannot change the password it connects with.
 - Immutable fields (user `username`, project `name`, robot `name`/`level`, group
@@ -119,14 +125,16 @@ kubectl get secret team-a-ci-harbor-credentials -o jsonpath='{.data.password}' |
 
 ## Development
 
-Prerequisites: Go 1.27, Operator SDK 1.42, Docker, kubectl, Helm. kind is needed for the end-to-end tests.
+Prerequisites: Go 1.27, [just](https://just.systems), Operator SDK 1.42, Docker, kubectl, Helm. kind is needed for the end-to-end tests.
 
 ```sh
-make test        # unit + envtest controller tests (uses an in-memory fake Harbor)
-make lint        # golangci-lint
-make kind-e2e    # Helm chart + operator against a real Harbor in kind
-make run         # run the controller locally against the current kubeconfig
+just test        # unit + envtest controller tests (uses an in-memory fake Harbor)
+just lint        # golangci-lint
+just kind-e2e    # Helm chart + operator against a real Harbor in kind
+just run         # run the controller locally against the current kubeconfig
 ```
+
+Run `just` to list every recipe.
 
 Layout:
 
@@ -137,14 +145,14 @@ Layout:
 - [charts/harbor-operator](charts/harbor-operator): Helm chart
 - [hack/kind-e2e.sh](hack/kind-e2e.sh): end-to-end test script
 
-After changing the API types or RBAC markers, run `make manifests generate helm-sync`.
+After changing the API types or RBAC markers, run `just manifests generate helm-sync`.
 
 ## Deploy
 
 With Helm (recommended):
 
 ```sh
-make docker-build docker-push IMG=<registry>/harbor-operator:<tag>
+just IMG=<registry>/harbor-operator:<tag> docker-build docker-push
 helm install harbor-operator ./charts/harbor-operator \
   --namespace harbor-operator-system --create-namespace \
   --set image.repository=<registry>/harbor-operator --set image.tag=<tag>
@@ -153,12 +161,12 @@ helm install harbor-operator ./charts/harbor-operator \
 With kustomize:
 
 ```sh
-make install                              # install CRDs
-make deploy IMG=<registry>/harbor-operator:<tag>
+just install                              # install CRDs
+just IMG=<registry>/harbor-operator:<tag> deploy
 ```
 
 Uninstall with `helm uninstall harbor-operator -n harbor-operator-system`, or
-`make undeploy` and `make uninstall`.
+`just undeploy` and `just uninstall`.
 
 ## CI and releases
 
@@ -166,7 +174,7 @@ GitHub Actions workflows in [.github/workflows](.github/workflows):
 
 | Workflow | Runs on | Does |
 |----------|---------|------|
-| `Tests` | every push and PR | `make test` |
+| `Tests` | every push and PR | `just test` |
 | `Lint` | every push and PR | golangci-lint, and checks that the Helm chart is in sync and lints |
 | `E2E Tests` | every push and PR | the scaffolded kustomize deployment test in kind |
 | `Build` | PRs, `main`, `v*.*.*` tags | builds the linux/amd64 + linux/arm64 image and smoke-tests it; pushes to GHCR except on PRs; on tags, also publishes the chart |

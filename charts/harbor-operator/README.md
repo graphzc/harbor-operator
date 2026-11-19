@@ -1,7 +1,7 @@
 # harbor-operator Helm chart
 
 Installs [harbor-operator](../../README.md), which manages Harbor users, groups,
-projects and robot accounts through Kubernetes resources.
+projects, robot accounts and system configuration through Kubernetes resources.
 
 ## Install
 
@@ -29,7 +29,7 @@ The CRDs are templates in this chart (`templates/crds/`), not files in the
 `crds/` directory, so `helm upgrade` updates them along with the operator.
 
 - `crds.install: false` skips them, for when CRDs are managed separately (for
-  example with `make install`).
+  example with `just install`).
 - `crds.keep: true` (the default) adds `helm.sh/resource-policy: keep`, so
   `helm uninstall` leaves the CRDs in place. Deleting a CRD deletes every
   resource of that kind. Each resource's finalizer then deletes its object in
@@ -38,7 +38,7 @@ The CRDs are templates in this chart (`templates/crds/`), not files in the
 
 The CRD templates and the manager's ClusterRole rules are generated. Do not
 edit them by hand: after changing the API types or RBAC markers, run
-`make helm-sync`. `make helm-verify` fails when the chart is out of date.
+`just helm-sync`. `just helm-verify` fails when the chart is out of date.
 
 ## Values
 

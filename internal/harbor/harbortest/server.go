@@ -47,7 +47,18 @@ type Server struct {
 	Members       map[int64][]harbor.Member
 	Robots        map[int64]*harbor.Robot
 	RobotSecrets  map[int64]string
+	// Configurations holds decoded configuration values by key.
+	Configurations map[string]any
+	// ConfigUpdates counts PUT /configurations requests.
+	ConfigUpdates int
 	nextID        int64
+}
+
+// writeOnlyConfigs are configuration keys Harbor accepts but never returns.
+var writeOnlyConfigs = map[string]bool{
+	"ldap_search_password": true,
+	"oidc_client_secret":   true,
+	"uaa_client_secret":    true,
 }
 
 // NewServer starts a fake Harbor with an "admin" system administrator.
@@ -63,7 +74,21 @@ func NewServer(adminPassword string) *Server {
 		Members:       map[int64][]harbor.Member{},
 		Robots:        map[int64]*harbor.Robot{},
 		RobotSecrets:  map[int64]string{},
-		nextID:        100,
+		Configurations: map[string]any{
+			"auth_mode":                    "db_auth",
+			"project_creation_restriction": "everyone",
+			"self_registration":            false,
+			"read_only":                    false,
+			"token_expiration":             float64(30),
+			"robot_token_duration":         float64(30),
+			"robot_name_prefix":            "robot$",
+			"oidc_name":                    "",
+			"oidc_endpoint":                "",
+			"oidc_client_id":               "",
+			"ldap_url":                     "",
+			"ldap_search_dn":               "",
+		},
+		nextID: 100,
 	}
 	mux := http.NewServeMux()
 	s.routes(mux)
@@ -534,6 +559,36 @@ func (s *Server) routes(mux *http.ServeMux) {
 		}
 		delete(s.Robots, id)
 		delete(s.RobotSecrets, id)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Configurations
+	h("GET /configurations", func(w http.ResponseWriter, _ *http.Request) {
+		out := map[string]harbor.ConfigItem{}
+		for k, v := range s.Configurations {
+			if writeOnlyConfigs[k] {
+				continue
+			}
+			raw, _ := json.Marshal(v)
+			out[k] = harbor.ConfigItem{Value: raw, Editable: true}
+		}
+		writeJSON(w, http.StatusOK, out)
+	})
+	h("PUT /configurations", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		if !decode(w, r, &body) {
+			return
+		}
+		for k := range body {
+			if _, ok := s.Configurations[k]; !ok && !writeOnlyConfigs[k] {
+				writeErr(w, http.StatusBadRequest, fmt.Sprintf("invalid configuration key %q", k))
+				return
+			}
+		}
+		for k, v := range body {
+			s.Configurations[k] = v
+		}
+		s.ConfigUpdates++
 		w.WriteHeader(http.StatusOK)
 	})
 }

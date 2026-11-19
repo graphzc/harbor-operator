@@ -21,4 +21,4 @@ Connect it to Harbor:
 
   kubectl get harborconnection harbor
 
-Then create Projects, Users, Groups and RobotAccounts that reference it.
+Then create Projects, Users, Groups, RobotAccounts and a Configuration that reference it.

@@ -7,6 +7,7 @@ resources:
 - bases/harbor.graphzc.io_robotaccounts.yaml
 - bases/harbor.graphzc.io_groups.yaml
 - bases/harbor.graphzc.io_projects.yaml
+- bases/harbor.graphzc.io_configurations.yaml
 # +kubebuilder:scaffold:crdkustomizeresource
 
 patches:
