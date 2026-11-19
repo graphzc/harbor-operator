@@ -1,0 +1,27 @@
+apiVersion: harbor.graphzc.io/v1alpha1
+kind: Configuration
+metadata:
+  labels:
+    app.kubernetes.io/name: harbor-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: harbor
+spec:
+  harborConnectionRef:
+    name: harbor
+  # Keys are the camelCase form of the keys returned by
+  # GET /api/v2.0/configurations (project_creation_restriction ->
+  # projectCreationRestriction). Keys not listed are left as they are in Harbor.
+  settings:
+    projectCreationRestriction: adminonly
+    robotTokenDuration: 90
+  # For OIDC authentication:
+  #   authMode: oidc_auth
+  #   oidcName: keycloak
+  #   oidcEndpoint: https://keycloak.example.com/realms/harbor
+  #   oidcClientId: harbor
+  #   oidcScope: openid,profile,email,offline_access
+  #   oidcVerifyCert: true
+  # secretSettings:
+  #   oidcClientSecret:
+  #     name: harbor-oidc
+  #     key: clientSecret

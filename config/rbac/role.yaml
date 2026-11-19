@@ -19,6 +19,7 @@ rules:
 - apiGroups:
   - harbor.graphzc.io
   resources:
+  - configurations
   - groups
   - harborconnections
   - projects
@@ -35,6 +36,7 @@ rules:
 - apiGroups:
   - harbor.graphzc.io
   resources:
+  - configurations/finalizers
   - groups/finalizers
   - harborconnections/finalizers
   - projects/finalizers
@@ -45,6 +47,7 @@ rules:
 - apiGroups:
   - harbor.graphzc.io
   resources:
+  - configurations/status
   - groups/status
   - harborconnections/status
   - projects/status

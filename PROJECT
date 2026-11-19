@@ -56,4 +56,13 @@ resources:
   kind: Project
   path: github.com/graphzc/harbor-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: graphzc.io
+  group: harbor
+  kind: Configuration
+  path: github.com/graphzc/harbor-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

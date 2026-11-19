@@ -17,10 +17,13 @@ limitations under the License.
 package controller
 
 import (
+	"maps"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -372,6 +375,11 @@ var _ = Describe("Harbor controllers", Ordered, func() {
 		updateSecret("deployer-secret", "token", "DeployerN3wSecret")
 		Eventually(withHarbor(func() string { return fakeHarbor.RobotSecrets[id] }), timeout, interval).
 			Should(Equal("DeployerN3wSecret"))
+		// Wait for the status write of that reconcile so robot is not stale.
+		Eventually(func(g Gomega) {
+			g.Expect(k8sClient.Get(ctx, key("deployer"), robot)).To(Succeed())
+			g.Expect(secretMatchesHash("DeployerN3wSecret", robot.Status.SecretHash)).To(BeTrue())
+		}, timeout, interval).Should(Succeed())
 
 		By("adopting the existing project robot when status is lost")
 		robot.Status = harborv1alpha1.RobotAccountStatus{}
@@ -403,6 +411,111 @@ var _ = Describe("Harbor controllers", Ordered, func() {
 		expectReady(user, func() []metav1.Condition { return user.Status.Conditions })
 		Expect(user.Status.PasswordHash).NotTo(BeEmpty())
 		deleteAndWait(user)
+	})
+
+	It("manages the Harbor configuration", func() {
+		createSecret("oidc", map[string]string{"clientSecret": "OidcS3cret"})
+		config := &harborv1alpha1.Configuration{
+			ObjectMeta: metav1.ObjectMeta{Namespace: testNamespace, Name: "harbor"},
+			Spec: harborv1alpha1.ConfigurationSpec{
+				HarborConnectionRef: connRef(),
+				Settings: map[string]apiextensionsv1.JSON{
+					"projectCreationRestriction": {Raw: []byte(`"adminonly"`)},
+					"robotTokenDuration":         {Raw: []byte(`90`)},
+					"selfRegistration":           {Raw: []byte(`false`)},
+				},
+				SecretSettings: map[string]harborv1alpha1.SecretKeySelector{
+					"oidcClientSecret": {Name: "oidc", Key: "clientSecret"},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, config)).To(Succeed())
+		expectReady(config, func() []metav1.Condition { return config.Status.Conditions })
+		Expect(config.Status.SecretSettingsHash).NotTo(BeEmpty())
+		settings := func() map[string]any { return maps.Clone(fakeHarbor.Configurations) }
+		Expect(withHarbor(settings)()).To(And(
+			HaveKeyWithValue("project_creation_restriction", "adminonly"),
+			HaveKeyWithValue("robot_token_duration", float64(90)),
+			HaveKeyWithValue("oidc_client_secret", "OidcS3cret"),
+			HaveKeyWithValue("auth_mode", "db_auth"),
+		))
+		updates := withHarbor(func() int { return fakeHarbor.ConfigUpdates })
+
+		// The controller writes status on every attempt, and retries failures
+		// with backoff, so spec changes are retried on conflict.
+		updateConfig := func(mutate func(spec *harborv1alpha1.ConfigurationSpec)) error {
+			var err error
+			Eventually(func() bool {
+				if err = k8sClient.Get(ctx, key("harbor"), config); err != nil {
+					return false
+				}
+				mutate(&config.Spec)
+				err = k8sClient.Update(ctx, config)
+				return !apierrors.IsConflict(err)
+			}, timeout, interval).Should(BeTrue())
+			return err
+		}
+		expectNotReady := func(message string) {
+			GinkgoHelper()
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Get(ctx, key("harbor"), config)).To(Succeed())
+				cond := meta.FindStatusCondition(config.Status.Conditions, harborv1alpha1.ConditionReady)
+				g.Expect(cond).NotTo(BeNil())
+				g.Expect(cond.ObservedGeneration).To(Equal(config.Generation))
+				g.Expect(cond.Status).To(Equal(metav1.ConditionFalse))
+				g.Expect(cond.Message).To(ContainSubstring(message))
+			}, timeout, interval).Should(Succeed())
+		}
+
+		By("not updating Harbor when it is in sync")
+		before := updates()
+		Expect(updateConfig(func(spec *harborv1alpha1.ConfigurationSpec) {
+			spec.Settings["robotTokenDuration"] = apiextensionsv1.JSON{Raw: []byte(`"90"`)}
+		})).To(Succeed())
+		expectReady(config, func() []metav1.Condition { return config.Status.Conditions })
+		Expect(updates()).To(Equal(before))
+
+		By("reverting drift and applying a rotated secret")
+		withHarbor(func() any { fakeHarbor.Configurations["project_creation_restriction"] = "everyone"; return nil })()
+		updateSecret("oidc", "clientSecret", "OidcN3wSecret")
+		Eventually(withHarbor(settings), timeout, interval).Should(And(
+			HaveKeyWithValue("project_creation_restriction", "adminonly"),
+			HaveKeyWithValue("oidc_client_secret", "OidcN3wSecret"),
+		))
+
+		By("reporting a key Harbor does not know")
+		Expect(updateConfig(func(spec *harborv1alpha1.ConfigurationSpec) {
+			spec.Settings["noSuchSetting"] = apiextensionsv1.JSON{Raw: []byte(`true`)}
+		})).To(Succeed())
+		expectNotReady("no_such_setting")
+		Expect(updateConfig(func(spec *harborv1alpha1.ConfigurationSpec) {
+			delete(spec.Settings, "noSuchSetting")
+		})).To(Succeed())
+		expectReady(config, func() []metav1.Condition { return config.Status.Conditions })
+
+		By("reporting a snake_case key")
+		Expect(updateConfig(func(spec *harborv1alpha1.ConfigurationSpec) {
+			spec.Settings["read_only"] = apiextensionsv1.JSON{Raw: []byte(`true`)}
+		})).To(Succeed())
+		expectNotReady(`settings key "read_only" must be camelCase, e.g. "readOnly"`)
+		Expect(withHarbor(settings)()).To(HaveKeyWithValue("read_only", false))
+
+		By("reporting a key in both settings and secretSettings")
+		Expect(updateConfig(func(spec *harborv1alpha1.ConfigurationSpec) {
+			delete(spec.Settings, "read_only")
+			spec.Settings["oidcClientSecret"] = apiextensionsv1.JSON{Raw: []byte(`"plain"`)}
+		})).To(Succeed())
+		expectNotReady("settings.oidcClientSecret and secretSettings.oidcClientSecret both set Harbor configuration oidc_client_secret")
+		Expect(withHarbor(settings)()).To(HaveKeyWithValue("oidc_client_secret", "OidcN3wSecret"))
+
+		By("rejecting a snake_case secretSettings key at admission")
+		Expect(updateConfig(func(spec *harborv1alpha1.ConfigurationSpec) {
+			spec.SecretSettings["ldap_search_password"] = harborv1alpha1.SecretKeySelector{Name: "oidc"}
+		})).To(MatchError(ContainSubstring("keys must be camelCase")))
+
+		By("leaving the settings in Harbor on delete")
+		deleteAndWait(config)
+		Expect(withHarbor(settings)()).To(HaveKeyWithValue("project_creation_restriction", "adminonly"))
 	})
 
 	It("deletes the project", func() {

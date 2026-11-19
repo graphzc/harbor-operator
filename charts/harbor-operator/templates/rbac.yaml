@@ -115,10 +115,10 @@ metadata:
     rbac.authorization.k8s.io/aggregate-to-edit: "true"
 rules:
   - apiGroups: [harbor.graphzc.io]
-    resources: [harborconnections, users, groups, projects, robotaccounts]
+    resources: [harborconnections, users, groups, projects, robotaccounts, configurations]
     verbs: [get, list, watch, create, update, patch, delete, deletecollection]
   - apiGroups: [harbor.graphzc.io]
-    resources: [harborconnections/status, users/status, groups/status, projects/status, robotaccounts/status]
+    resources: [harborconnections/status, users/status, groups/status, projects/status, robotaccounts/status, configurations/status]
     verbs: [get]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -130,10 +130,10 @@ metadata:
     rbac.authorization.k8s.io/aggregate-to-view: "true"
 rules:
   - apiGroups: [harbor.graphzc.io]
-    resources: [harborconnections, users, groups, projects, robotaccounts]
+    resources: [harborconnections, users, groups, projects, robotaccounts, configurations]
     verbs: [get, list, watch]
   - apiGroups: [harbor.graphzc.io]
-    resources: [harborconnections/status, users/status, groups/status, projects/status, robotaccounts/status]
+    resources: [harborconnections/status, users/status, groups/status, projects/status, robotaccounts/status, configurations/status]
     verbs: [get]
 {{- end }}
 {{- end }}
