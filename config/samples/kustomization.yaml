@@ -1,0 +1,8 @@
+## Append samples of your project ##
+resources:
+- harbor_v1alpha1_harborconnection.yaml
+- harbor_v1alpha1_user.yaml
+- harbor_v1alpha1_robotaccount.yaml
+- harbor_v1alpha1_group.yaml
+- harbor_v1alpha1_project.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

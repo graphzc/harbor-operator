@@ -1,0 +1,15 @@
+apiVersion: harbor.graphzc.io/v1alpha1
+kind: Group
+metadata:
+  labels:
+    app.kubernetes.io/name: harbor-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: developers
+spec:
+  harborConnectionRef:
+    name: harbor
+  groupName: developers
+  groupType: HTTP
+  # For LDAP groups:
+  # groupType: LDAP
+  # ldapGroupDN: cn=developers,ou=groups,dc=example,dc=com

@@ -1,0 +1,29 @@
+apiVersion: harbor.graphzc.io/v1alpha1
+kind: Project
+metadata:
+  labels:
+    app.kubernetes.io/name: harbor-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: team-a
+spec:
+  harborConnectionRef:
+    name: harbor
+  name: team-a
+  public: false
+  storageQuota: 50Gi
+  policies:
+    autoScan: true
+    autoSBOMGeneration: true
+    preventVulnerable: true
+    severity: high
+    reuseSysCVEAllowlist: false
+    cveAllowlist:
+      items:
+        - CVE-2024-0001
+  members:
+    - kind: User
+      name: alice
+      role: Maintainer
+    - kind: Group
+      name: developers
+      role: Developer

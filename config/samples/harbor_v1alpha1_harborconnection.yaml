@@ -1,0 +1,18 @@
+# Create the admin password Secret first, e.g.:
+#   kubectl create secret generic harbor-admin --from-literal=password='<admin password>'
+apiVersion: harbor.graphzc.io/v1alpha1
+kind: HarborConnection
+metadata:
+  labels:
+    app.kubernetes.io/name: harbor-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: harbor
+spec:
+  url: https://harbor.example.com
+  username: admin
+  passwordSecretRef:
+    name: harbor-admin
+    key: password
+  # caSecretRef:
+  #   name: harbor-ca
+  #   key: ca.crt
