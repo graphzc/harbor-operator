@@ -4,13 +4,13 @@ There are three levels of tests.
 
 | Command | What it runs | Needs |
 |---------|--------------|-------|
-| `make test` | Unit tests and controller tests in envtest against an in-memory fake Harbor | Go |
-| `make lint` | golangci-lint | Go |
-| `make kind-e2e` | The Helm chart and operator against a real Harbor in kind | Docker, kind, kubectl, helm, curl, python3 |
+| `just test` | Unit tests and controller tests in envtest against an in-memory fake Harbor | Go |
+| `just lint` | golangci-lint | Go |
+| `just kind-e2e` | The Helm chart and operator against a real Harbor in kind | Docker, kind, kubectl, helm, curl, python3 |
 
 ## Controller tests
 
-`make test` downloads the envtest binaries (kube-apiserver and etcd), starts
+`just test` downloads the envtest binaries (kube-apiserver and etcd), starts
 the five controllers, and runs them against
 [harbortest](../internal/harbor/harbortest/server.go), an in-memory Harbor API.
 The tests also dry-run every manifest in `config/samples` against the CRD schemas.
@@ -24,8 +24,8 @@ fake, update the fake and add a test.
 ## End-to-end tests in kind
 
 ```sh
-make kind-e2e                    # creates and deletes the cluster
-KEEP_CLUSTER=true make kind-e2e  # keeps it for inspection; reruns reuse it
+just kind-e2e                    # creates and deletes the cluster
+KEEP_CLUSTER=true just kind-e2e  # keeps it for inspection; reruns reuse it
 ```
 
 [hack/kind-e2e.sh](../hack/kind-e2e.sh):

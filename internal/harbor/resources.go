@@ -18,6 +18,7 @@ package harbor
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -68,6 +69,9 @@ type API interface {
 	UpdateRobot(ctx context.Context, id int64, r Robot) error
 	SetRobotSecret(ctx context.Context, id int64, secret string) (string, error)
 	DeleteRobot(ctx context.Context, id int64) error
+
+	GetConfigurations(ctx context.Context) (map[string]ConfigItem, error)
+	UpdateConfigurations(ctx context.Context, settings map[string]json.RawMessage) error
 }
 
 var _ API = (*Client)(nil)
@@ -523,6 +527,28 @@ func (c *Client) SetRobotSecret(ctx context.Context, id int64, secret string) (s
 
 func (c *Client) DeleteRobot(ctx context.Context, id int64) error {
 	_, err := c.do(ctx, http.MethodDelete, fmt.Sprintf("/robots/%d", id), nil, nil, nil)
+	return err
+}
+
+// ---- Configurations ----
+
+// ConfigItem is a system configuration value. Harbor does not return
+// credentials such as ldap_search_password or oidc_client_secret.
+type ConfigItem struct {
+	Value    json.RawMessage `json:"value"`
+	Editable bool            `json:"editable"`
+}
+
+// GetConfigurations returns the system configuration keyed by setting name.
+func (c *Client) GetConfigurations(ctx context.Context) (map[string]ConfigItem, error) {
+	var out map[string]ConfigItem
+	_, err := c.do(ctx, http.MethodGet, "/configurations", nil, nil, &out)
+	return out, err
+}
+
+// UpdateConfigurations sets the given configuration keys; others are unchanged.
+func (c *Client) UpdateConfigurations(ctx context.Context, settings map[string]json.RawMessage) error {
+	_, err := c.do(ctx, http.MethodPut, "/configurations", nil, settings, nil)
 	return err
 }
 

@@ -128,12 +128,12 @@ k -n "$NS" create secret generic puller-secret --from-literal=secret=PullerS3cre
   --dry-run=client -o yaml | k apply -f - >/dev/null
 sed 's#https://harbor.example.com#http://harbor.harbor.svc.cluster.local#' \
   "$ROOT/config/samples/harbor_v1alpha1_harborconnection.yaml" | k -n "$NS" apply -f - >/dev/null
-for kind in user group project robotaccount; do
+for kind in user group project robotaccount configuration; do
   k -n "$NS" apply -f "$ROOT/config/samples/harbor_v1alpha1_${kind}.yaml" >/dev/null
 done
 k -n "$NS" wait --for=condition=Ready harborconnection/harbor --timeout=120s >/dev/null
-k -n "$NS" wait --for=condition=Ready users,groups,projects,robotaccounts --all --timeout=180s >/dev/null
-k -n "$NS" get harborconnections,users,groups,projects,robotaccounts
+k -n "$NS" wait --for=condition=Ready users,groups,projects,robotaccounts,configurations --all --timeout=180s >/dev/null
+k -n "$NS" get harborconnections,users,groups,projects,robotaccounts,configurations
 pass "all resources Ready"
 
 log "Verifying Harbor state"
@@ -170,6 +170,10 @@ pass "project robot ${ci_user} gets pull,push on team-a"
 [ "$(token_actions 'robot$puller:PullerS3cretValue' 'repository:team-a/app:pull,push')" = "pull" ] || fail "system robot token"
 pass "system robot robot\$puller gets pull only, with the referenced secret"
 
+cfg="$(admin_get /configurations | json '(d["project_creation_restriction"]["value"], d["robot_token_duration"]["value"])')"
+[ "$cfg" = "('adminonly', 90)" ] || fail "configuration: $cfg"
+pass "configuration applied: $cfg"
+
 log "Rotating the system robot secret"
 k -n "$NS" create secret generic puller-secret --from-literal=secret=PullerN3wSecretValue \
   --dry-run=client -o yaml | k apply -f - >/dev/null
@@ -193,11 +197,13 @@ log "Deleting resources"
 uid="$(k -n "$NS" get user alice -o jsonpath='{.status.userID}')"
 rid="$(k -n "$NS" get robotaccount team-a-ci -o jsonpath='{.status.robotID}')"
 k -n "$NS" delete robotaccounts --all --wait --timeout 60s >/dev/null
-k -n "$NS" delete projects,users,groups --all --wait --timeout 60s >/dev/null
+k -n "$NS" delete projects,users,groups,configurations --all --wait --timeout 60s >/dev/null
 for path in "/robots/${rid}" "/projects/${pid}" "/users/${uid}" "/usergroups/${gid}"; do
   [ "$(api "admin:${ADMIN_PASSWORD}" "$path")" = 404 ] || fail "$path still exists in Harbor"
 done
 pass "robot, project, user and group removed from Harbor"
+[ "$(admin_get /configurations | json 'd["project_creation_restriction"]["value"]')" = adminonly ] || fail "configuration reset on delete"
+pass "configuration left in place on delete"
 secrets_gone() { ! k -n "$NS" get secret alice-credentials team-a-ci-credentials >/dev/null 2>&1; }
 eventually secrets_gone || fail "generated Secrets not garbage collected"
 pass "generated Secrets garbage collected"

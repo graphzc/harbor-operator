@@ -34,11 +34,14 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Setup just
+        uses: extractions/setup-just@v3
+
       - name: Setup Helm
         uses: azure/setup-helm@v4
 
       - name: Verify the chart matches the generated manifests
-        run: make helm-verify
+        run: just helm-verify
 
       - name: Lint the chart
-        run: make helm-lint
+        run: just helm-lint

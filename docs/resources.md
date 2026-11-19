@@ -17,7 +17,7 @@ to Secrets in the same namespace.
   in Harbor are reverted. They are also reconciled when the spec, the
   `HarborConnection`, or a referenced Secret changes.
 - **Adoption.** An existing Harbor object with the same name is taken over.
-- **Deletion.** `deletionPolicy: Delete` (default) removes the Harbor object;
+- **Deletion.** Except for `Configuration`, `deletionPolicy: Delete` (default) removes the Harbor object;
   `Orphan` leaves it. If the `HarborConnection` or its Secret no longer exists,
   the resource is released without cleanup.
 - **Generated credentials.** When `User` or `RobotAccount` has no Secret reference,
@@ -152,4 +152,79 @@ spec:
     - namespace: "*"
       access:
         - { resource: repository, action: pull }
+```
+
+## Configuration
+
+Manages Harbor system settings through `/api/v2.0/configurations`.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `settings` | | Map of camelCase configuration key to value, e.g. `authMode`, `projectCreationRestriction`, `robotTokenDuration`, `oidcEndpoint`, `ldapUrl`. |
+| `secretSettings` | | Map of camelCase configuration key to a Secret key, for credentials such as `oidcClientSecret` or `ldapSearchPassword`. A key cannot be in both maps. |
+
+Status: `secretSettingsHash` (bcrypt).
+
+### Keys
+
+Keys are the camelCase form of the snake_case keys returned by
+`GET /api/v2.0/configurations`. The operator converts them back before calling
+Harbor. Value types are Harbor's, and values are sent unchanged, so
+`authMode: oidc_auth` keeps its snake_case value.
+
+| Harbor key | Key in `settings` / `secretSettings` |
+|------------|--------------------------------------|
+| `auth_mode` | `authMode` |
+| `project_creation_restriction` | `projectCreationRestriction` |
+| `self_registration` | `selfRegistration` |
+| `read_only` | `readOnly` |
+| `token_expiration` | `tokenExpiration` |
+| `robot_token_duration` | `robotTokenDuration` |
+| `robot_name_prefix` | `robotNamePrefix` |
+| `oidc_endpoint` | `oidcEndpoint` |
+| `oidc_client_id` | `oidcClientId` (or `oidcClientID`) |
+| `oidc_client_secret` | `oidcClientSecret` |
+| `ldap_url` | `ldapUrl` (or `ldapURL`) |
+| `ldap_search_password` | `ldapSearchPassword` |
+
+- Keys must match `^[a-z][a-zA-Z0-9]*$`. A snake_case key makes the resource
+  report `Ready=False` with the camelCase form to use. In `secretSettings` it is
+  rejected at admission.
+- A run of capitals counts as one word, so `ldapURL` and `ldapUrl` both mean
+  `ldap_url`. Setting both, or setting a key in both maps, is reported as an
+  error.
+
+### Behavior
+
+- Only listed keys are managed; every other setting is left as it is in Harbor.
+  Listed keys that drift are set back on the next resync.
+- Only keys whose value differs are sent to Harbor. Scalars are compared by
+  their string form, so `"90"` and `90` are equal.
+- Harbor never returns credentials, so `secretSettings` are applied when the
+  referenced Secret values change, not when they drift in Harbor.
+- Unknown keys, keys Harbor reports as not editable (for example, set through
+  environment variables), and values Harbor rejects make the resource report
+  `Ready=False`. Harbor's messages name the snake_case key. Harbor only allows
+  changing `authMode` while no users other than `admin` exist.
+- There is no `deletionPolicy`: Harbor has a single configuration, so deleting
+  the resource leaves the settings in place.
+- Use one `Configuration` per Harbor instance, or give each one distinct keys.
+  Two resources that set the same key keep overwriting each other.
+
+```yaml
+apiVersion: harbor.graphzc.io/v1alpha1
+kind: Configuration
+metadata:
+  name: harbor
+spec:
+  harborConnectionRef: { name: harbor }
+  settings:
+    authMode: oidc_auth
+    oidcName: keycloak
+    oidcEndpoint: https://keycloak.example.com/realms/harbor
+    oidcClientId: harbor
+    oidcScope: openid,profile,email,offline_access
+    projectCreationRestriction: adminonly
+  secretSettings:
+    oidcClientSecret: { name: harbor-oidc, key: clientSecret }
 ```
